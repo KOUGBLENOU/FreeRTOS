@@ -117,6 +117,8 @@
 static void prvQueueReceiveTask( void * pvParameters );
 static void prvQueueSendTask( void * pvParameters );
 
+static void prvQueueSendTraceTask(void *pvParameters);
+
 /*
  * The callback function executed when the software timer expires.
  */
@@ -138,7 +140,7 @@ void main_blinky( void )
     const TickType_t xTimerPeriod = mainTIMER_SEND_FREQUENCY_MS;
 
     /* Create the queue. */
-    xQueue = xQueueCreate( mainQUEUE_LENGTH, sizeof( uint32_t ) );
+    xQueue = xQueueCreate( mainQUEUE_LENGTH + 2, sizeof( char ) * 256 );
 
     if( xQueue != NULL )
     {
@@ -153,6 +155,7 @@ void main_blinky( void )
 
         xTaskCreate( prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE, NULL, mainQUEUE_SEND_TASK_PRIORITY, NULL );
 
+        xTaskCreate( prvQueueSendTraceTask, "TraceTx", configMINIMAL_STACK_SIZE, NULL, mainQUEUE_SEND_TASK_PRIORITY, NULL );
         /* Create the software timer, but don't start it yet. */
         xTimer = xTimerCreate( "Timer",                     /* The text name assigned to the software timer - for debug only as it is not used by the kernel. */
                                xTimerPeriod,                /* The period of the software timer in ticks. */
@@ -204,7 +207,43 @@ static void prvQueueSendTask( void * pvParameters )
          * write to the console.  0 is used as the block time so the send operation
          * will not block - it shouldn't need to block as the queue should always
          * have at least one space at this point in the code. */
-        xQueueSend( xQueue, &ulValueToSend, 0U );
+        char b[256];
+        snprintf(b, sizeof(b),"%c%lu", 't', ulValueToSend);
+        // xQueueSend( xQueue, &b, 0U );
+    }
+}
+
+
+
+static void prvQueueSendTraceTask(void *pvParameters) {
+    TickType_t xNextWakeTime;
+    const TickType_t xBlockTime = mainTASK_SEND_FREQUENCY_MS;
+    /* Prevent the compiler warning about the unused parameter. */
+    ( void ) pvParameters;
+
+    /* Initialise xNextWakeTime - this only needs to be done once. */
+    xNextWakeTime = xTaskGetTickCount();
+    
+    FILE * pxInputFile;
+    pxInputFile = fopen("input_branchflow_trace.csv", "r");
+    
+    
+    if (pxInputFile == NULL) {
+        console_print("Error: Could not open input branchflow file");
+        return;
+    } else {
+        size_t bytes_read;
+        char buffer[256];
+        while ((bytes_read = fread(buffer, 1, sizeof(buffer) - 1, pxInputFile)) > 0) {
+            buffer[bytes_read] = '\0';
+            // console_print(buffer);
+            xQueueSend( xQueue, &buffer, 0U );
+            vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+        }
+        fclose(pxInputFile);
+        for (;;) {
+            vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+        }
     }
 }
 /*-----------------------------------------------------------*/
@@ -230,7 +269,8 @@ static void prvQueueSendTimerCallback( TimerHandle_t xTimerHandle )
 
 static void prvQueueReceiveTask( void * pvParameters )
 {
-    uint32_t ulReceivedValue;
+    // uint32_t ulReceivedValue;
+    char ulReceivedValueBuffer[256];
 
     /* Prevent the compiler warning about the unused parameter. */
     ( void ) pvParameters;
@@ -241,7 +281,7 @@ static void prvQueueReceiveTask( void * pvParameters )
          * indefinitely provided INCLUDE_vTaskSuspend is set to 1 in
          * FreeRTOSConfig.h.  It will not use any CPU time while it is in the
          * Blocked state. */
-        xQueueReceive( xQueue, &ulReceivedValue, portMAX_DELAY );
+        xQueueReceive( xQueue, &ulReceivedValueBuffer, portMAX_DELAY );
 
         /* To get here something must have been received from the queue, but
          * is it an expected value?  Normally calling printf() from a task is not
@@ -249,18 +289,21 @@ static void prvQueueReceiveTask( void * pvParameters )
          * using console IO so it is ok.  However, note the comments at the top of
          * this file about the risks of making Linux system calls (such as
          * console output) from a FreeRTOS task. */
-        if( ulReceivedValue == mainVALUE_SENT_FROM_TASK )
-        {
-            console_print( "Message received from task\n" );
-        }
-        else if( ulReceivedValue == mainVALUE_SENT_FROM_TIMER )
-        {
-            console_print( "Message received from software timer\n" );
-        }
-        else
-        {
-            console_print( "Unexpected message\n" );
-        }
+        // if( ulReceivedValueBuffer == mainVALUE_SENT_FROM_TASK )
+        // {
+        //     console_print( "Message received from task\n" );
+        // }
+        // else if( ulReceivedValueBuffer == mainVALUE_SENT_FROM_TIMER )
+        // {
+        //     console_print( "Message received from software timer\n" );
+        // }
+        // else
+        // {
+        //     console_print( "Unexpected message\n" );
+        //     console_print( ulReceivedValueBuffer[0] + "\n" );
+        // }
+        console_print(ulReceivedValueBuffer);
+        console_print("\n");
     }
 }
 /*-----------------------------------------------------------*/
