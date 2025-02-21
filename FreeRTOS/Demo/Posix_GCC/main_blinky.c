@@ -116,7 +116,6 @@
  */
 static void prvQueueReceiveTask( void * pvParameters );
 static void prvQueueSendTask( void * pvParameters );
-
 static void prvQueueSendTraceTask(void *pvParameters);
 
 /*
@@ -208,8 +207,8 @@ static void prvQueueSendTask( void * pvParameters )
          * will not block - it shouldn't need to block as the queue should always
          * have at least one space at this point in the code. */
         char b[256];
-        snprintf(b, sizeof(b),"%c%lu", 't', ulValueToSend);
-        // xQueueSend( xQueue, &b, 0U );
+        snprintf(b, sizeof(b),"%d", ulValueToSend);
+        xQueueSend( xQueue, &b, 0U );
     }
 }
 
@@ -230,21 +229,18 @@ static void prvQueueSendTraceTask(void *pvParameters) {
     
     if (pxInputFile == NULL) {
         console_print("Error: Could not open input branchflow file");
-        return;
     } else {
         size_t bytes_read;
         char buffer[256];
         while ((bytes_read = fread(buffer, 1, sizeof(buffer) - 1, pxInputFile)) > 0) {
             buffer[bytes_read] = '\0';
-            // console_print(buffer);
             xQueueSend( xQueue, &buffer, 0U );
             vTaskDelayUntil( &xNextWakeTime, xBlockTime );
         }
         fclose(pxInputFile);
-        for (;;) {
-            vTaskDelayUntil( &xNextWakeTime, xBlockTime );
-        }
     }
+
+    for (;;) {}
 }
 /*-----------------------------------------------------------*/
 
@@ -263,13 +259,14 @@ static void prvQueueSendTimerCallback( TimerHandle_t xTimerHandle )
     /* Send to the queue - causing the queue receive task to unblock and
      * write out a message.  This function is called from the timer/daemon task, so
      * must not block.  Hence the block time is set to 0. */
-    xQueueSend( xQueue, &ulValueToSend, 0U );
+    char b[256];
+    snprintf(b, sizeof(b),"%d", ulValueToSend);
+    xQueueSend( xQueue, &b, 0U );
 }
 /*-----------------------------------------------------------*/
 
 static void prvQueueReceiveTask( void * pvParameters )
 {
-    // uint32_t ulReceivedValue;
     char ulReceivedValueBuffer[256];
 
     /* Prevent the compiler warning about the unused parameter. */
@@ -289,19 +286,6 @@ static void prvQueueReceiveTask( void * pvParameters )
          * using console IO so it is ok.  However, note the comments at the top of
          * this file about the risks of making Linux system calls (such as
          * console output) from a FreeRTOS task. */
-        // if( ulReceivedValueBuffer == mainVALUE_SENT_FROM_TASK )
-        // {
-        //     console_print( "Message received from task\n" );
-        // }
-        // else if( ulReceivedValueBuffer == mainVALUE_SENT_FROM_TIMER )
-        // {
-        //     console_print( "Message received from software timer\n" );
-        // }
-        // else
-        // {
-        //     console_print( "Unexpected message\n" );
-        //     console_print( ulReceivedValueBuffer[0] + "\n" );
-        // }
         console_print(ulReceivedValueBuffer);
         console_print("\n");
     }
