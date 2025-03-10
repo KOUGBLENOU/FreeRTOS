@@ -149,12 +149,12 @@ void main_blinky( void )
                      "Rx",                            /* The text name assigned to the task - for debug only as it is not used by the kernel. */
                      configMINIMAL_STACK_SIZE,        /* The size of the stack to allocate to the task. */
                      NULL,                            /* The parameter passed to the task - not used in this simple case. */
-                     mainQUEUE_RECEIVE_TASK_PRIORITY, /* The priority assigned to the task. */
+                     3, /* The priority assigned to the task. */
                      NULL );                          /* The task handle is not required, so NULL is passed. */
 
-        xTaskCreate( prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE, NULL, mainQUEUE_SEND_TASK_PRIORITY, NULL );
+        xTaskCreate( prvQueueSendTask, "TX", configMINIMAL_STACK_SIZE, NULL, 2, NULL );
 
-        xTaskCreate( prvQueueSendTraceTask, "TraceTx", configMINIMAL_STACK_SIZE, NULL, mainQUEUE_SEND_TASK_PRIORITY, NULL );
+        xTaskCreate( prvQueueSendTraceTask, "KosTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL );
         /* Create the software timer, but don't start it yet. */
         xTimer = xTimerCreate( "Timer",                     /* The text name assigned to the software timer - for debug only as it is not used by the kernel. */
                                xTimerPeriod,                /* The period of the software timer in ticks. */
@@ -235,7 +235,7 @@ static void prvQueueSendTraceTask(void *pvParameters) {
         while ((bytes_read = fread(buffer, 1, sizeof(buffer) - 1, pxInputFile)) > 0) {
             buffer[bytes_read] = '\0';
             xQueueSend( xQueue, &buffer, 0U );
-            vTaskDelayUntil( &xNextWakeTime, xBlockTime );
+            vTaskDelayUntil( &xNextWakeTime, xBlockTime/2 );
         }
         fclose(pxInputFile);
     }
